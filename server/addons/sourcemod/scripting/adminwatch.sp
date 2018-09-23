@@ -21,32 +21,31 @@
 #include <sourcemod>
 
 // DB Handles
-new Handle:hDatabase = INVALID_HANDLE;
-//new Handle:hQuery = INVALID_HANDLE;
+Handle hDatabase = INVALID_HANDLE;
 
 // Timer Handles
-new Handle:hTimerTotal[MAXPLAYERS + 1] = INVALID_HANDLE;
-new Handle:hTimerPlayed[MAXPLAYERS + 1] = INVALID_HANDLE;
+Handle hTimerTotal[MAXPLAYERS + 1] = INVALID_HANDLE;
+Handle hTimerPlayed[MAXPLAYERS + 1] = INVALID_HANDLE;
 
 // Cvar Handles
-new Handle:cvarEnabled = INVALID_HANDLE;
-new Handle:cvarLoggingEnabled = INVALID_HANDLE;
-new Handle:cvarAdminFlag = INVALID_HANDLE;
-new Handle:cvarPrecision = INVALID_HANDLE;
+Handle cvarEnabled = INVALID_HANDLE;
+Handle cvarLoggingEnabled = INVALID_HANDLE;
+Handle cvarAdminFlag = INVALID_HANDLE;
+Handle cvarPrecision = INVALID_HANDLE;
 
 // Globals
-new bool:gEnabled;
-new bool:gLoggingEnabled;
-new String:gAdminFlag[MAXPLAYERS + 1];
-new gAdminFlagBits = 0;
-new bool:gPrecision;
+bool gEnabled;
+bool gLoggingEnabled;
+char gAdminFlag[MAXPLAYERS + 1];
+int gAdminFlagBits = 0;
+bool gPrecision;
 
 // Trackers
-new gTrackTotal[MAXPLAYERS + 1] = 0;
-new gTrackPlayed[MAXPLAYERS + 1] = 0;
+int gTrackTotal[MAXPLAYERS + 1] = 0;
+int gTrackPlayed[MAXPLAYERS + 1] = 0;
 
 // Database Queries
-new const String:DBQueries[4][] =
+char DBQueries[] =
 {
 	"CREATE TABLE IF NOT EXISTS `adminwatch` (`id` INT(10) NOT NULL AUTO_INCREMENT, `steam` VARCHAR(50) NOT NULL, `name` VARCHAR(50) NOT NULL, `total` INT(11) NOT NULL DEFAULT '0', `played` INT(11) NOT NULL DEFAULT '0', `last_played` VARCHAR(50) NOT NULL, PRIMARY KEY (`id`)) COLLATE='latin1_swedish_ci' ENGINE=MyISAM;",
 	"SELECT * FROM `adminwatch` WHERE `steam` = '%s'",
@@ -54,14 +53,14 @@ new const String:DBQueries[4][] =
 	"INSERT INTO `adminwatch` (`steam`, `name`, `total`, `played`, `last_played`) VALUES ('%s', '%s', '0', '0', '')"
 };
 
-new const String:DBQueriesLogs[2][] =
+char DBQueriesLogs[] =
 {
 	"CREATE TABLE IF NOT EXISTS `adminwatch_logs` (`id` INT(10) NOT NULL AUTO_INCREMENT, `hostname` VARCHAR(50) NOT NULL, `name` VARCHAR(50) NOT NULL, `steam` VARCHAR(50) NOT NULL, `command` VARCHAR(100) NOT NULL, `time` VARCHAR(50) NOT NULL, PRIMARY KEY (`id`)) COLLATE='latin1_swedish_ci' ENGINE=MyISAM;",
 	"INSERT INTO `adminwatch_logs` (`hostname`, `steam`, `name`, `command`, `time`) VALUES ('%s', '%s', '%s', '%s', '%i')"
 };
 
 // Plugin Info
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
 	name = "adminWatch (Redux)",
 	author = "Pat841 and Spectre Servers",
@@ -97,7 +96,7 @@ public OnPluginStart ()
 	HookConVarChange(cvarPrecision, HandleCvars);
 	
 	// Connect to Database
-	new String:error[255];
+	char error[64];
 	hDatabase = SQL_Connect("adminwatch", true, error, sizeof(error));
 	
 	if (hDatabase == INVALID_HANDLE)
