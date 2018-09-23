@@ -18,7 +18,6 @@
  */
  
 #define PLUGIN_VERSION "1.3"
-
 #include <sourcemod>
 
 // DB Handles
@@ -78,30 +77,24 @@ public OnPluginStart ()
 	HookEvent("round_end", Event_RoundEnd);
 	
 	// Create ConVars
-	CreateConVar("sm_adminwatch_version", PLUGIN_VERSION, "adminWatch plugin version (unchangeable)", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	CreateConVar("sm_adminwatch_version", PLUGIN_VERSION, "adminWatch plugin version (unchangeable)", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
-	cvarEnabled = CreateConVar("sm_adminwatch_enabled", "1", "Enables or disables the plugin: 0 - Disabled, 1 - Enabled", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	cvarEnabled = CreateConVar("sm_adminwatch_enabled", "1", "Enables or disables the plugin: 0 - Disabled, 1 - Enabled", _, true, 0.0, true, 1.0);
 	gEnabled = true;
 	
-	cvarLoggingEnabled = CreateConVar("sm_adminwatch_logging", "1", "Enables or disables logging commands: 0 - Disabled, 1 - Enabled", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	cvarLoggingEnabled = CreateConVar("sm_adminwatch_logging", "1", "Enables or disables logging commands: 0 - Disabled, 1 - Enabled", _, true, 0.0, true, 1.0);
 	gLoggingEnabled = true;
 	
 	cvarAdminFlag = CreateConVar("sm_adminwatch_adminflag", "1", "The admin flag to track: 1 - All admins, flag values: abcdefghijklmnopqrst");
 	Format(gAdminFlag, sizeof(gAdminFlag), "z");
 	
-	cvarPrecision = CreateConVar("sm_adminwatch_precision", "0", "Timer precision. Careful, use 0 if rounds end in less than 1 minute: 0 - Seconds, 1 - Minutes", FCVAR_PLUGIN, true, 0.0, true, 1.0);
+	cvarPrecision = CreateConVar("sm_adminwatch_precision", "0", "Timer precision. Careful, use 0 if rounds end in less than 1 minute: 0 - Seconds, 1 - Minutes", _, true, 0.0, true, 1.0);
 	gPrecision = false;
 	
 	// Hook Cvar Changes
 	HookConVarChange(cvarEnabled, HandleCvars);
 	HookConVarChange(cvarAdminFlag, HandleCvars);
 	HookConVarChange(cvarPrecision, HandleCvars);
-	
-	// Updater?
-	if (LibraryExists("updater"))
-	{
-		Updater_AddPlugin(UPDATE_URL);
-	}
 	
 	// Connect to Database
 	new String:error[255];
@@ -112,10 +105,6 @@ public OnPluginStart ()
 		LogError("Unable to connect to the database. Error: %s", error);
 		LogMessage("[adminWatch] - Unable to connect to the database.");
 	}
-	
-#if _DEBUG
-	LogMessage("[adminWatch DEBUG] - Connected to the database in OnPluginStart().");
-#endif
 	
 	// Autoload Config
 	AutoExecConfig(true, "adminwatch");
@@ -128,14 +117,6 @@ public OnPluginStart ()
 	if (gLoggingEnabled)
 	{
 		SQL_TQuery(hDatabase, DBNoAction, DBQueriesLogs[0], DBPrio_High);
-	}
-}
-
-public OnLibraryAdded(const String:name[])
-{
-	if (StrEqual(name, "updater"))
-	{
-		Updater_AddPlugin(UPDATE_URL);
 	}
 }
 
@@ -153,10 +134,6 @@ public OnConfigsExecuted ()
 	gPrecision = GetConVarBool(cvarPrecision);
 	RefreshFlags();
 	ResetTrackers();
-	
-#if _DEBUG
-	LogMessage("[adminWatch DEBUG] - Fetched ConVars and refreshed flags in OnConfigsExecuted().");
-#endif
 }
 
 public OnClientPostAdminCheck (client)
@@ -183,10 +160,6 @@ public OnClientPostAdminCheck (client)
 		{
 			hTimerTotal[client] = CreateTimer(1.0, TimerAddTotal, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 		}
-		
-#if _DEBUG
-		LogMessage("[adminWatch DEBUG] - Total timer started in OnClientPostAdminCheck().");
-#endif
 	}
 }
 
@@ -195,9 +168,6 @@ public OnClientDisconnect (client)
 	if (gEnabled && (GetUserFlagBits(client) & gAdminFlagBits))
 	{
 		CheckoutClient(client);
-#if _DEBUG
-		LogMessage("[adminWatch DEBUG] - Checked client out in OnClientDisconnect().");
-#endif
 	}
 	
 	ResetClient(client);
@@ -236,10 +206,7 @@ public Action:Event_RoundEnd (Handle:event, const String:name[], bool:dontBroadc
 				CloseHandle(hTimerPlayed[i]);
 				hTimerPlayed[i] = INVALID_HANDLE;
 			}
-		}
-#if _DEBUG
-		LogMessage("[adminWatch DEBUG] - Round ended, closed handles in Event_RoundEnd().");
-#endif		
+		}	
 	}
 }
 
@@ -322,9 +289,6 @@ public DBCheckout (Handle:owner, Handle:hndl, const String:error[], any:data)
 			
 			total += gTrackTotal[data];
 			played += gTrackPlayed[data];
-#if _DEBUG
-			LogMessage("[adminWatch DEBUG] - Updating client in database for total values (Total: %i, Played: %i) and session values (Total: %i, Played: %i) in DBCheckout().", total, played, gTrackTotal[data], gTrackPlayed[data]);
-#endif
 			
 			Format(query, sizeof(query), DBQueries[2], total, played, time, steam);
 			SQL_TQuery(hDatabase, DBNoAction, query, DBPrio_High);
@@ -374,9 +338,6 @@ public Action:TimerAddTotal (Handle:timer, any:client)
 {
 	if (hTimerTotal[client] != INVALID_HANDLE)
 	{
-#if _DEBUG
-		LogMessage("[adminWatch DEBUG] - Adding a minute to total tracker in TimerAddTotal().");
-#endif
 		gTrackTotal[client] += 1;
 	}
 }
@@ -385,9 +346,6 @@ public Action:TimerAddPlayed (Handle:timer, any:client)
 {
 	if (hTimerPlayed[client] != INVALID_HANDLE)
 	{
-#if _DEBUG
-		LogMessage("[adminWatch DEBUG] - Adding a minute to played tracker in TimerAddPlayed().");
-#endif
 		gTrackPlayed[client] += 1;
 	}
 }
@@ -424,12 +382,6 @@ public HandleCvars (Handle:cvar, const String:oldValue[], const String:newValue[
 	{
 		gPrecision = false;
 	}
-		
-#if _DEBUG
-	new String:cvarName[32];
-	GetConVarName(cvar, cvarName, sizeof(cvarName)); 
-	LogMessage("[adminWatch DEBUG] - Cvar (%s) changed from \"%s\" to \"%s\" in HandleCvars().", cvarName, oldValue, newValue);
-#endif
 }
 
 public RefreshFlags ()
@@ -440,10 +392,6 @@ public RefreshFlags ()
 		Format(gAdminFlag, sizeof(gAdminFlag), "bcdefghijklmnopqrstz");
 	}
 	gAdminFlagBits = ReadFlagString(gAdminFlag);
-	
-#if _DEBUG
-	LogMessage("[adminWatch DEBUG] - Refreshed flags in RefreshFlags().");
-#endif
 	
 	return true;
 }
