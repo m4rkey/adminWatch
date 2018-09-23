@@ -17,51 +17,46 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>
  */
  
-#define PLUGIN_VERSION "1.3"
 #include <sourcemod>
+#pragma newdecls required
+#define PLUGIN_VERSION "1.3"  
 
 // DB Handles
-new Handle:hDatabase = INVALID_HANDLE;
-//new Handle:hQuery = INVALID_HANDLE;
+Handle hDatabase = INVALID_HANDLE;
 
 // Timer Handles
-new Handle:hTimerTotal[MAXPLAYERS + 1] = INVALID_HANDLE;
-new Handle:hTimerPlayed[MAXPLAYERS + 1] = INVALID_HANDLE;
+Handle hTimerTotal[MAXPLAYERS + 1] = INVALID_HANDLE;
+Handle hTimerPlayed[MAXPLAYERS + 1] = INVALID_HANDLE;
 
 // Cvar Handles
-new Handle:cvarEnabled = INVALID_HANDLE;
-new Handle:cvarLoggingEnabled = INVALID_HANDLE;
-new Handle:cvarAdminFlag = INVALID_HANDLE;
-new Handle:cvarPrecision = INVALID_HANDLE;
+Handle cvarEnabled = INVALID_HANDLE;
+Handle cvarLoggingEnabled = INVALID_HANDLE;
+Handle cvarAdminFlag = INVALID_HANDLE;
+Handle cvarPrecision = INVALID_HANDLE;
 
 // Globals
-new bool:gEnabled;
-new bool:gLoggingEnabled;
-new String:gAdminFlag[MAXPLAYERS + 1];
-new gAdminFlagBits = 0;
-new bool:gPrecision;
+bool gEnabled;
+bool gLoggingEnabled;
+char gAdminFlag[MAXPLAYERS + 1];
+int gAdminFlagBits = 0;
+bool gPrecision;
 
 // Trackers
-new gTrackTotal[MAXPLAYERS + 1] = 0;
-new gTrackPlayed[MAXPLAYERS + 1] = 0;
+int gTrackTotal[MAXPLAYERS + 1] = 0;
+int gTrackPlayed[MAXPLAYERS + 1] = 0;
 
 // Database Queries
-new const String:DBQueries[4][] =
+char DBQueries[] =
 {
-	"CREATE TABLE IF NOT EXISTS `adminwatch` (`id` INT(10) NOT NULL AUTO_INCREMENT, `steam` VARCHAR(50) NOT NULL, `name` VARCHAR(50) NOT NULL, `total` INT(11) NOT NULL DEFAULT '0', `played` INT(11) NOT NULL DEFAULT '0', `last_played` VARCHAR(50) NOT NULL, PRIMARY KEY (`id`)) COLLATE='latin1_swedish_ci' ENGINE=MyISAM;",
 	"SELECT * FROM `adminwatch` WHERE `steam` = '%s'",
 	"UPDATE `adminwatch` SET `total` = '%i', `played` = '%i', `last_played` = '%i' WHERE `steam` = '%s'",
 	"INSERT INTO `adminwatch` (`steam`, `name`, `total`, `played`, `last_played`) VALUES ('%s', '%s', '0', '0', '')"
 };
 
-new const String:DBQueriesLogs[2][] =
-{
-	"CREATE TABLE IF NOT EXISTS `adminwatch_logs` (`id` INT(10) NOT NULL AUTO_INCREMENT, `hostname` VARCHAR(50) NOT NULL, `name` VARCHAR(50) NOT NULL, `steam` VARCHAR(50) NOT NULL, `command` VARCHAR(100) NOT NULL, `time` VARCHAR(50) NOT NULL, PRIMARY KEY (`id`)) COLLATE='latin1_swedish_ci' ENGINE=MyISAM;",
-	"INSERT INTO `adminwatch_logs` (`hostname`, `steam`, `name`, `command`, `time`) VALUES ('%s', '%s', '%s', '%s', '%i')"
-};
+char DBQueriesLogs[] = "INSERT INTO `adminwatch_logs` (`hostname`, `steam`, `name`, `command`, `time`) VALUES ('%s', '%s', '%s', '%s', '%i')";
 
 // Plugin Info
-public Plugin:myinfo = 
+public Plugin myinfo = 
 {
 	name = "adminWatch (Redux)",
 	author = "Pat841 and Spectre Servers",
@@ -70,7 +65,7 @@ public Plugin:myinfo =
 	url = "https://spectre.gg/"
 };
 
-public OnPluginStart ()
+public void OnPluginStart()
 {
 	// Hook Events
 	HookEvent("round_start", Event_RoundStart);
@@ -97,7 +92,7 @@ public OnPluginStart ()
 	HookConVarChange(cvarPrecision, HandleCvars);
 	
 	// Connect to Database
-	new String:error[255];
+	char error[64];
 	hDatabase = SQL_Connect("adminwatch", true, error, sizeof(error));
 	
 	if (hDatabase == INVALID_HANDLE)
@@ -108,25 +103,15 @@ public OnPluginStart ()
 	
 	// Autoload Config
 	AutoExecConfig(true, "adminwatch");
-	
-	// If needed, create tables
-	if (gEnabled)
-	{
-		SQL_TQuery(hDatabase, DBNoAction, DBQueries[0], DBPrio_High);
-	}
-	if (gLoggingEnabled)
-	{
-		SQL_TQuery(hDatabase, DBNoAction, DBQueriesLogs[0], DBPrio_High);
-	}
 }
 
-public OnPluginEnd ()
+public void OnPluginEnd()
 {
 	CloseHandle(hDatabase);
 	hDatabase = INVALID_HANDLE;
 }
 
-public OnConfigsExecuted ()
+public void OnConfigsExecuted()
 {
 	gEnabled = GetConVarBool(cvarEnabled);
 	gLoggingEnabled = GetConVarBool(cvarLoggingEnabled);
@@ -136,7 +121,7 @@ public OnConfigsExecuted ()
 	ResetTrackers();
 }
 
-public OnClientPostAdminCheck (client)
+public void OnClientPostAdminCheck(int client)
 {
 	// Reset client
 	ResetClient(client);
@@ -145,8 +130,8 @@ public OnClientPostAdminCheck (client)
 	if (gEnabled && (GetUserFlagBits(client) & gAdminFlagBits))
 	{
 		// Add to database if needed
-		decl String:query[255], String:authid[32];
-		GetClientAuthString(client, authid, sizeof(authid));
+		char query[255], authid[32];
+		GetClientAuthId(client, AuthId_Steam2, authid, sizeof(authid));
 		
 		Format(query, sizeof(query), DBQueries[1], authid);
 		SQL_TQuery(hDatabase, DBInsert, query, client, DBPrio_High);
@@ -163,7 +148,7 @@ public OnClientPostAdminCheck (client)
 	}
 }
 
-public OnClientDisconnect (client)
+public void OnClientDisconnect(int client)
 {
 	if (gEnabled && (GetUserFlagBits(client) & gAdminFlagBits))
 	{
@@ -174,11 +159,11 @@ public OnClientDisconnect (client)
 }
 
 // Events
-public Action:Event_RoundStart (Handle:event, const String:name[], bool:dontBroadcast)
+public Action Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
 {
 	if (gEnabled)
 	{
-		for (new i = 1; i <= MaxClients; i++)
+		for (int i = 1; i <= MaxClients; i++)
 		{
 			if (IsClientInGame(i) && (GetUserFlagBits(i) & gAdminFlagBits) && (GetClientTeam(i) == 2 || GetClientTeam(i) == 3) && hTimerPlayed[i] == INVALID_HANDLE)
 			{
@@ -195,11 +180,11 @@ public Action:Event_RoundStart (Handle:event, const String:name[], bool:dontBroa
 	}
 }
 
-public Action:Event_RoundEnd (Handle:event, const String:name[], bool:dontBroadcast)
+public Action Event_RoundEnd(Handle event, const char[] name, bool dontBroadcast)
 {
 	if (gEnabled)
 	{
-		for (new i = 1; i <= MaxClients; i++)
+		for (int i = 1; i <= MaxClients; i++)
 		{
 			if (IsClientInGame(i) && (GetUserFlagBits(i) & gAdminFlagBits) && hTimerPlayed[i] != INVALID_HANDLE)
 			{
@@ -211,7 +196,7 @@ public Action:Event_RoundEnd (Handle:event, const String:name[], bool:dontBroadc
 }
 
 // Credit: Modified TSCDan's function
-public Action:OnLogAction (Handle:source, Identity:ident, client, target, const String:message[])
+public Action OnLogAction(Handle source, Identity ident, int client, int target, const char[] message)
 {
 	/* If there is no client or they're not an admin, we don't care. */
 	if (!gLoggingEnabled || client < 1 || !(GetUserFlagBits(client) & gAdminFlagBits))
@@ -221,40 +206,40 @@ public Action:OnLogAction (Handle:source, Identity:ident, client, target, const 
 	}
 	
 	// Get steam
-	new String:query[400], String:authid[32];
-	GetClientAuthString(client, authid, sizeof(authid));
+	char query[400], authid[32];
+	GetClientAuthId(client, AuthId_Steam2,  authid, sizeof(authid));
 	
 	// Get name
-	new String:name[30];
+	char name[30];
 	GetClientName(client, name, sizeof(name));
 	
 	// Get hostname
-	new String:hostname[60];
-	new Handle:cvarHostname = INVALID_HANDLE;
+	char hostname[60];
+	Handle cvarHostname = INVALID_HANDLE;
 	cvarHostname = FindConVar("hostname");
 	GetConVarString(cvarHostname, hostname, sizeof(hostname));
 	
 	// Escape
-	new String:bName[61];
-	new String:bHost[121];
+	char bName[61];
+	char bHost[121];
 	
 	SQL_EscapeString(hDatabase, name, bName, sizeof(bName));
 	SQL_EscapeString(hDatabase, hostname, bHost, sizeof(bHost));
 	
-	new time = GetTime();
+	int time = GetTime();
 	
-	Format(query, sizeof(query), DBQueriesLogs[1], bHost, authid, bName, message, time);
+	Format(query, sizeof(query), DBQueriesLogs, bHost, authid, bName, message, time);
 	
 	SQL_TQuery(hDatabase, DBNoAction, query, client, DBPrio_High);
 	
 	return Plugin_Handled;
 }
 
-public CheckoutClient (client)
+public bool CheckoutClient(int client)
 {
 	// Get authid (steamid)
-	new String:query[255], String:authid[32];
-	GetClientAuthString(client, authid, sizeof(authid));
+	char query[255], authid[32];
+	GetClientAuthId(client, AuthId_Steam2, authid, sizeof(authid));
 	
 	Format(query, sizeof(query), DBQueries[1], authid);
 	
@@ -264,7 +249,7 @@ public CheckoutClient (client)
 }
 
 // Database Threads
-public DBCheckout (Handle:owner, Handle:hndl, const String:error[], any:data)
+public void DBCheckout(Handle owner, Handle hndl, const char[] error, any data)
 {
 	if (hndl == INVALID_HANDLE)
 	{
@@ -272,17 +257,17 @@ public DBCheckout (Handle:owner, Handle:hndl, const String:error[], any:data)
 	}
 	else
 	{
-		new String:query[255];
+		char query[255];
 		
 		if (SQL_FetchRow(hndl))
 		{
-			new String:steam[30];
+			char steam[30];
 			SQL_FetchString(hndl, 1, steam, sizeof(steam));
 			
-			new time = GetTime();
+			int time = GetTime();
 			
-			new total = 0;
-			new played = 0;
+			int total = 0;
+			int played = 0;
 			
 			total = SQL_FetchInt(hndl, 3);
 			played = SQL_FetchInt(hndl, 4);
@@ -300,7 +285,7 @@ public DBCheckout (Handle:owner, Handle:hndl, const String:error[], any:data)
 	}
 }
 
-public DBInsert (Handle:owner, Handle:hndl, const String:error[], any:data)
+public void DBInsert(Handle owner, Handle hndl, const char[] error, any data)
 {
 	if (hndl == INVALID_HANDLE)
 	{
@@ -311,10 +296,10 @@ public DBInsert (Handle:owner, Handle:hndl, const String:error[], any:data)
 		if (SQL_GetRowCount(hndl) <= 0)
 		{
 			// Not found, insert
-			decl String:query[255], String:authid[32];
-			GetClientAuthString(data, authid, sizeof(authid));
+			char query[255], authid[32];
+			GetClientAuthId(data, AuthId_Steam2, authid, sizeof(authid));
 			
-			new String:name[60], String:buffer[30];
+			char name[60], buffer[30];
 			GetClientName(data, buffer, sizeof(buffer));
 			
 			SQL_EscapeString(hDatabase, buffer, name, sizeof(name));
@@ -325,7 +310,7 @@ public DBInsert (Handle:owner, Handle:hndl, const String:error[], any:data)
 	}
 }
 
-public DBNoAction (Handle:owner, Handle:hndl, const String:error[], any:data)
+public void DBNoAction(Handle owner, Handle hndl, const char[] error, any data)
 {
 	if (hndl == INVALID_HANDLE)
 	{
@@ -334,7 +319,7 @@ public DBNoAction (Handle:owner, Handle:hndl, const String:error[], any:data)
 }
 
 // Tracker Functions
-public Action:TimerAddTotal (Handle:timer, any:client)
+public Action TimerAddTotal (Handle timer, any client)
 {
 	if (hTimerTotal[client] != INVALID_HANDLE)
 	{
@@ -342,7 +327,7 @@ public Action:TimerAddTotal (Handle:timer, any:client)
 	}
 }
 
-public Action:TimerAddPlayed (Handle:timer, any:client)
+public Action TimerAddPlayed (Handle timer, any client)
 {
 	if (hTimerPlayed[client] != INVALID_HANDLE)
 	{
@@ -351,7 +336,7 @@ public Action:TimerAddPlayed (Handle:timer, any:client)
 }
 
 // Helper Functions
-public HandleCvars (Handle:cvar, const String:oldValue[], const String:newValue[])
+public void HandleCvars(Handle cvar, const char[] oldValue, const char[] newValue)
 {
 	if (cvar == cvarEnabled && StrEqual(newValue, "1"))
 	{
@@ -384,7 +369,7 @@ public HandleCvars (Handle:cvar, const String:oldValue[], const String:newValue[
 	}
 }
 
-public RefreshFlags ()
+public bool RefreshFlags()
 {
 	if (StrEqual(gAdminFlag, "1"))
 	{
@@ -396,9 +381,9 @@ public RefreshFlags ()
 	return true;
 }
 
-public ResetTrackers ()
+public void ResetTrackers()
 {
-	for (new i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		gTrackTotal[i] = 0;
 		gTrackPlayed[i] = 0;
@@ -417,7 +402,7 @@ public ResetTrackers ()
 	}
 }
 
-public ResetClient (client)
+public bool ResetClient(int client)
 {
 	if (hTimerTotal[client] != INVALID_HANDLE)
 	{
