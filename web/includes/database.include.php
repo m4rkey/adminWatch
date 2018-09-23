@@ -7,9 +7,9 @@ class Database
 	var $User     = "";             	// User and Password for login.
 	var $Password = "";
 
-	var $Link_ID  = 0;                  // Result of mysql_connect().
-	var $Query_ID = 0;                  // Result of most recent mysql_query().
-	var $Record   = array();            // current mysql_fetch_array()-result.
+	var $Link_ID  = 0;                  // Result of mysqli_connect().
+	var $Query_ID = 0;                  // Result of most recent mysqli_query().
+	var $Record   = array();            // current mysqli_fetch_array()-result.
 	var $Row;                           // current row number.
 	var $LoginError = "";
 
@@ -22,10 +22,10 @@ class Database
 	function connect()
 	{
 		if( 0 == $this->Link_ID )
-			$this->Link_ID=mysql_connect( $this->Host, $this->User, $this->Password );
+			$this->Link_ID=mysqli_connect( $this->Host, $this->User, $this->Password );
 		if( !$this->Link_ID )
 			$this->halt( "Link-ID == false, connect failed" );
-		if( !mysql_query( sprintf( "use %s", $this->Database ), $this->Link_ID ) )
+		if( !mysqli_query( sprintf( "use %s", $this->Database ), $this->Link_ID ) )
 			$this->halt( "cannot use database ".$this->Database );
 	}
 
@@ -35,10 +35,10 @@ class Database
 	function query( $Query_String )
 	{
 		$this->connect();
-		$this->Query_ID = mysql_query( $Query_String,$this->Link_ID );
+		$this->Query_ID = mysqli_query( $Query_String,$this->Link_ID );
 		$this->Row = 0;
-		$this->Errno = mysql_errno();
-		$this->Error = mysql_error();
+		$this->Errno = mysqli_errno();
+		$this->Error = mysqli_error();
 		if( !$this->Query_ID )
 			$this->halt( "Invalid SQL: ".$Query_String );
 		return $this->Query_ID;
@@ -59,14 +59,14 @@ class Database
 	//-------------------------------------------
 	function nextRecord()
 	{
-		@ $this->Record = mysql_fetch_array( $this->Query_ID );
+		@ $this->Record = mysqli_fetch_array( $this->Query_ID );
 		$this->Row += 1;
-		$this->Errno = mysql_errno();
-		$this->Error = mysql_error();
+		$this->Errno = mysqli_errno();
+		$this->Error = mysqli_error();
 		$stat = is_array( $this->Record );
 		if( !$stat )
 		{
-			@ mysql_free_result( $this->Query_ID );
+			@ mysqli_free_result( $this->Query_ID );
 			$this->Query_ID = 0;
 		}
 		return $stat;
@@ -77,7 +77,7 @@ class Database
 	//-------------------------------------------
 	function singleRecord()
 	{
-		$this->Record = mysql_fetch_array( $this->Query_ID );
+		$this->Record = mysqli_fetch_array( $this->Query_ID );
 		$stat = is_array( $this->Record );
 		return $stat;
 	}
@@ -87,7 +87,7 @@ class Database
 	//-------------------------------------------
 	function numRows()
 	{
-		return mysql_num_rows( $this->Query_ID );
+		return mysqli_num_rows( $this->Query_ID );
 	}
 
 	//-------------------------------------------
@@ -95,13 +95,13 @@ class Database
 	//-------------------------------------------
 	function lastId()
 	{
-		return mysql_insert_id();
+		return mysqli_insert_id();
 	}
 
 	//-------------------------------------------
 	//    Returns Escaped string
 	//-------------------------------------------
-	function mysql_escape_mimic($inp)
+	function mysqli_escape_mimic($inp)
 	{
 		if(is_array($inp))
 			return array_map(__METHOD__, $inp);
@@ -116,7 +116,7 @@ class Database
 	//-------------------------------------------
 	function affectedRows()
 	{
-		return mysql_affected_rows();
+		return mysqli_affected_rows();
 	}
 
 	//-------------------------------------------
@@ -124,7 +124,7 @@ class Database
 	//-------------------------------------------
 	function numFields()
 	{
-		return mysql_num_fields($this->Query_ID);
+		return mysqli_num_fields($this->Query_ID);
 	}
 
 }
