@@ -1,6 +1,6 @@
 /*
- * SourceMod adminWatch
- * by:Pat841 @ www.amitygaming.org
+ * SourceMod adminWatch (Redux)
+ * by:Pat841 @ www.amitygaming.org and Spectre Servers
  *
  * This file is part of SM adminWatch.
  *
@@ -15,55 +15,11 @@
  *
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>
- * 
- * CHANGELOG:
- * 
- * 	1.2.2
- * 		- Fixed updater being required, now optional
- * 		- Fixed checkout bug
- * 		- Fixed web script bug
- * 
- * 	1.2.1
- * 		- Fixed bug for DateTime in web script
- * 
- * 	1.2
- * 		- Added support for the updater plugin
- * 		- Added hostname tracking for admin logs
- * 		- Updated web script to display server hostnames
- * 
- * 	1.1
- * 		- Fixed a warning for date() on the web script
- * 		- Added cvar to enable logging admin commands
- * 		- Added LogAction () method to log admin commands
- * 		- Updated web script to display admin commands
- * 
- * 	1.0.3
- * 		- Changed how play time is recorded to fix some issues
- * 		- Added storing admin name and last time connected (UNIX) in the database
- * 		- Updated web script to display new info
- * 
- * 	1.0.2
- * 		- Fixed some bugs.
- * 		- Added a php script to display stats
- * 	
- * 	1.0.1:
- * 		- Added sm_adminwatch_precision flag to allow poll tracking every minute or every second.
- * 
- * 	1.0
- * 		- Initial release.
  */
  
-#define PLUGIN_VERSION "1.2.2"
-
-#pragma semicolon 1
-
-#define _DEBUG 0
-#define UPDATE_URL    "http://pat841.amitygaming.org/adminwatch/updater.txt"
+#define PLUGIN_VERSION "1.3"
 
 #include <sourcemod>
-#undef REQUIRE_PLUGIN
-#include <updater>
-#define REQUIRE_PLUGIN
 
 // DB Handles
 new Handle:hDatabase = INVALID_HANDLE;
@@ -108,17 +64,16 @@ new const String:DBQueriesLogs[2][] =
 // Plugin Info
 public Plugin:myinfo = 
 {
-	name = "adminWatch",
-	author = "Pat841",
+	name = "adminWatch (Redux)",
+	author = "Pat841 and Spectre Servers",
 	description = "Tracks play time and server idle time for a specific admin flag and stores results in a database.",
 	version = PLUGIN_VERSION,
-	url = "http://www.amitygaming.org/"
+	url = "https://spectre.gg/"
 };
 
 public OnPluginStart ()
 {
 	// Hook Events
-	//HookEvent("player_spawn", Event_PlayerSpawn);
 	HookEvent("round_start", Event_RoundStart);
 	HookEvent("round_end", Event_RoundEnd);
 	
