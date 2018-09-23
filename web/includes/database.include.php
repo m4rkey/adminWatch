@@ -25,7 +25,7 @@ class Database
 			$this->Link_ID=mysqli_connect( $this->Host, $this->User, $this->Password );
 		if( !$this->Link_ID )
 			$this->halt( "Link-ID == false, connect failed" );
-		if( !mysqli_query( sprintf( "use %s", $this->Database ), $this->Link_ID ) )
+		if( !mysqli_query( $this->Link_ID, sprintf( "use %s", $this->Database ) ) )
 			$this->halt( "cannot use database ".$this->Database );
 	}
 
@@ -35,7 +35,7 @@ class Database
 	function query( $Query_String )
 	{
 		$this->connect();
-		$this->Query_ID = mysqli_query( $Query_String,$this->Link_ID );
+		$this->Query_ID = mysqli_query( $this->Link_ID, $Query_String );
 		$this->Row = 0;
 		$this->Errno = mysqli_errno();
 		$this->Error = mysqli_error();
