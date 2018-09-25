@@ -50,7 +50,7 @@ char DBQueries[][] =
 {
 	"SELECT * FROM `adminwatch` WHERE `steam` = '%s'",
 	"UPDATE `adminwatch` SET `total` = '%i', `last_played` = '%i' WHERE `steam` = '%s'",
-	"INSERT INTO `adminwatch` (`steam`, `name`, `total`, `played`, `last_played`) VALUES ('%s', '%s', '0', '0', '')"
+	"INSERT INTO `adminwatch` (`steam`, `name`, `total`, `last_played`) VALUES ('%s', '%s', '0', '')"
 };
 
 char DBQueriesLogs[] = "INSERT INTO `adminwatch_logs` (`hostname`, `steam`, `name`, `command`, `time`) VALUES ('%s', '%s', '%s', '%s', '%i')";
