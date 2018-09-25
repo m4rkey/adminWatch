@@ -17,7 +17,6 @@ $db = new Database();
 $db->query('SELECT * FROM `adminwatch`');
 
 $admins = array ();
-$totalIdle = 0;
 $totalPlayed = 0;
 while ($db->nextRecord())
 {
@@ -34,12 +33,10 @@ while ($db->nextRecord())
 		'steam' => $db->Record['steam'],
 		'name' => $db->Record['name'],
 		'total' => convertTime($db->Record['total']),
-		'played' => convertTime($db->Record['played']),
 		'last_played' => $date
 	);
 
-	$totalIdle += $db->Record['total'];
-	$totalPlayed += $db->Record['played'];
+	$totalPlayed += $db->Record['total'];
 }
 ?>
 
@@ -65,7 +62,6 @@ while ($db->nextRecord())
 
 	<div id="content">
 <div class="cf">
-	<div class="summary-box">Total Idle: <?php echo convertTime($totalIdle); ?></div>
 	<div class="summary-box">Total Played: <?php echo convertTime($totalPlayed); ?></div>
 </div>
 	<h3>Individual Stats:</h3>
@@ -77,7 +73,7 @@ while ($db->nextRecord())
 			<h4><?php echo $admin['name']; ?></h4>
 			<p><em>Steam</em>: <?php echo $admin['steam']; ?></p>
 			<p><em>Last Played</em>: <?php echo $admin['last_played']; ?></p>
-			<p class="score">Idle: <?php echo $admin['total']; ?>, Played: <?php echo $admin['played']; ?></p>
+			<p class="score">Time Played: <?php echo $admin['total'];?></p>
 		</div>
 		<?php
 		}
@@ -114,7 +110,7 @@ while ($db->nextRecord())
 </div>
 
 	<div id="footer">
-		Created by Pat841
+		Created by Pat841 and Spectre Servers
 	</div>
 </div>
 </body></html>
