@@ -46,10 +46,10 @@ int gTrackTotal[MAXPLAYERS + 1] = 0;
 int gTrackPlayed[MAXPLAYERS + 1] = 0;
 
 // Database Queries
-char DBQueries[] =
+char DBQueries[][] =
 {
 	"SELECT * FROM `adminwatch` WHERE `steam` = '%s'",
-	"UPDATE `adminwatch` SET `total` = '%i', `played` = '%i', `last_played` = '%i' WHERE `steam` = '%s'",
+	"UPDATE `adminwatch` SET `total` = '%i', `last_played` = '%i' WHERE `steam` = '%s'",
 	"INSERT INTO `adminwatch` (`steam`, `name`, `total`, `played`, `last_played`) VALUES ('%s', '%s', '0', '0', '')"
 };
 
@@ -66,11 +66,7 @@ public Plugin myinfo =
 };
 
 public void OnPluginStart()
-{
-	// Hook Events
-	HookEvent("round_start", Event_RoundStart);
-	HookEvent("round_end", Event_RoundEnd);
-	
+{	
 	// Create ConVars
 	CreateConVar("sm_adminwatch_version", PLUGIN_VERSION, "adminWatch plugin version (unchangeable)", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	
@@ -123,6 +119,12 @@ public void OnConfigsExecuted()
 
 public void OnClientPostAdminCheck(int client)
 {
+	// Delay the admin check by 1.5 second so other admin tools can catch up.
+	CreateTimer(1.5, Timer_DelayAdminCheck, client);
+}
+
+public Action Timer_DelayAdminCheck(Handle timer, any client)
+{
 	// Reset client
 	ResetClient(client);
 	
@@ -133,7 +135,7 @@ public void OnClientPostAdminCheck(int client)
 		char query[255], authid[32];
 		GetClientAuthId(client, AuthId_Steam2, authid, sizeof(authid));
 		
-		Format(query, sizeof(query), DBQueries[1], authid);
+		Format(query, sizeof(query), DBQueries[0], authid);
 		SQL_TQuery(hDatabase, DBInsert, query, client, DBPrio_High);
 		
 		// Is admin, start timer to track total time in server
@@ -143,6 +145,7 @@ public void OnClientPostAdminCheck(int client)
 		}
 		else if (hTimerTotal[client] == INVALID_HANDLE)
 		{
+			LogMessage("[adminWatch] Starting Timer.")
 			hTimerTotal[client] = CreateTimer(1.0, TimerAddTotal, client, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
 		}
 	}
@@ -154,84 +157,66 @@ public void OnClientDisconnect(int client)
 	{
 		CheckoutClient(client);
 	}
-	
+
 	ResetClient(client);
 }
 
-// Events
-public Action Event_RoundStart(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (gEnabled)
-	{
-		for (int i = 1; i <= MaxClients; i++)
-		{
-			if (IsClientInGame(i) && (GetUserFlagBits(i) & gAdminFlagBits) && (GetClientTeam(i) == 2 || GetClientTeam(i) == 3) && hTimerPlayed[i] == INVALID_HANDLE)
-			{
-				if (gPrecision)
-				{
-					hTimerPlayed[i] = CreateTimer(60.0, TimerAddPlayed, i, TIMER_REPEAT);
-				}
-				else
-				{
-					hTimerPlayed[i] = CreateTimer(1.0, TimerAddPlayed, i, TIMER_REPEAT);
-				}
-			}
-		}
-	}
-}
-
-public Action Event_RoundEnd(Handle event, const char[] name, bool dontBroadcast)
-{
-	if (gEnabled)
-	{
-		for (int i = 1; i <= MaxClients; i++)
-		{
-			if (IsClientInGame(i) && (GetUserFlagBits(i) & gAdminFlagBits) && hTimerPlayed[i] != INVALID_HANDLE)
-			{
-				CloseHandle(hTimerPlayed[i]);
-				hTimerPlayed[i] = INVALID_HANDLE;
-			}
-		}	
-	}
-}
-
 // Credit: Modified TSCDan's function
+
+DataPack OLAPack;
 public Action OnLogAction(Handle source, Identity ident, int client, int target, const char[] message)
 {
+	// Delay the log action by 1.5 second so other admin tools can catch up.
+	CreateDataTimer(1.5, Timer_DelayLogAction, OLAPack);
+	OLAPack.WriteCell(client);
+	OLAPack.WriteString(message);
+	OLAPack.Reset();
+
+	return Plugin_Handled;
+}
+
+public Action Timer_DelayLogAction(Handle timer, DataPack pack)
+{
+	int client;
+	char message[255];
+
+	client = pack.ReadCell();
+	pack.ReadString(message, sizeof(message));
+
 	/* If there is no client or they're not an admin, we don't care. */
-	if (!gLoggingEnabled || client < 1 || !(GetUserFlagBits(client) & gAdminFlagBits))
+	if (!gLoggingEnabled || client < 1 || !IsClientConnected(client) || IsClientConnected(client) && !(GetUserFlagBits(client) & gAdminFlagBits))
 	{
-		LogMessage("[adminWatch DEBUG] - Client: %d, Target: %d inside OnLogAction().", client, target);
-		return Plugin_Continue;
+		return Plugin_Stop;
 	}
-	
-	// Get steam
-	char query[400], authid[32];
-	GetClientAuthId(client, AuthId_Steam2,  authid, sizeof(authid));
-	
-	// Get name
-	char name[30];
-	GetClientName(client, name, sizeof(name));
-	
-	// Get hostname
-	char hostname[60];
-	Handle cvarHostname = INVALID_HANDLE;
-	cvarHostname = FindConVar("hostname");
-	GetConVarString(cvarHostname, hostname, sizeof(hostname));
-	
-	// Escape
-	char bName[61];
-	char bHost[121];
-	
-	SQL_EscapeString(hDatabase, name, bName, sizeof(bName));
-	SQL_EscapeString(hDatabase, hostname, bHost, sizeof(bHost));
-	
-	int time = GetTime();
-	
-	Format(query, sizeof(query), DBQueriesLogs, bHost, authid, bName, message, time);
-	
-	SQL_TQuery(hDatabase, DBNoAction, query, client, DBPrio_High);
-	
+	else if (IsClientInGame(client) && !IsFakeClient(client)) { 
+		// Get steam
+		char query[400], authid[32];
+		GetClientAuthId(client, AuthId_Steam2,  authid, sizeof(authid));
+		
+		// Get name
+		char name[30];
+		GetClientName(client, name, sizeof(name));
+		
+		// Get hostname
+		char hostname[60];
+		Handle cvarHostname = INVALID_HANDLE;
+		cvarHostname = FindConVar("hostname");
+		GetConVarString(cvarHostname, hostname, sizeof(hostname));
+		
+		// Escape
+		char bName[61];
+		char bHost[121];
+		
+		SQL_EscapeString(hDatabase, name, bName, sizeof(bName));
+		SQL_EscapeString(hDatabase, hostname, bHost, sizeof(bHost));
+		
+		int time = GetTime();
+		
+		Format(query, sizeof(query), DBQueriesLogs, bHost, authid, bName, message, time);
+		
+		SQL_TQuery(hDatabase, DBNoAction, query, client, DBPrio_High);
+	}
+
 	return Plugin_Handled;
 }
 
@@ -240,10 +225,10 @@ public bool CheckoutClient(int client)
 	// Get authid (steamid)
 	char query[255], authid[32];
 	GetClientAuthId(client, AuthId_Steam2, authid, sizeof(authid));
-	
-	Format(query, sizeof(query), DBQueries[1], authid);
-	
-	SQL_TQuery(hDatabase, DBCheckout, query, client, DBPrio_High);
+
+	Format(query, sizeof(query), DBQueries[0], authid);
+
+	SQL_TQuery(hDatabase, DBCheckout, query, gTrackTotal[client], DBPrio_High);
 	
 	return true;
 }
@@ -256,26 +241,23 @@ public void DBCheckout(Handle owner, Handle hndl, const char[] error, any data)
 		LogMessage("[adminWatch] - DB Query Failed. Error: %s", error);
 	}
 	else
-	{
+	{	
 		char query[255];
 		
 		if (SQL_FetchRow(hndl))
 		{
 			char steam[30];
 			SQL_FetchString(hndl, 1, steam, sizeof(steam));
-			
+
 			int time = GetTime();
 			
 			int total = 0;
-			int played = 0;
 			
 			total = SQL_FetchInt(hndl, 3);
-			played = SQL_FetchInt(hndl, 4);
+			total += data;
 			
-			total += gTrackTotal[data];
-			played += gTrackPlayed[data];
-			
-			Format(query, sizeof(query), DBQueries[2], total, played, time, steam);
+			Format(query, sizeof(query), DBQueries[1], total, time, steam);
+
 			SQL_TQuery(hDatabase, DBNoAction, query, DBPrio_High);
 		}
 		else
@@ -304,7 +286,7 @@ public void DBInsert(Handle owner, Handle hndl, const char[] error, any data)
 			
 			SQL_EscapeString(hDatabase, buffer, name, sizeof(name));
 			
-			Format(query, sizeof(query), DBQueries[3], authid, name);
+			Format(query, sizeof(query), DBQueries[2], authid, name);
 			SQL_TQuery(hDatabase, DBNoAction, query, DBPrio_High);
 		}
 	}
